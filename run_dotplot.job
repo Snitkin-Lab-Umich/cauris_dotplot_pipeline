@@ -1,0 +1,16 @@
+#!/bin/bash
+
+#SBATCH --mail-user=jjhale@umich.edu
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --export=ALL
+#SBATCH --partition=standard
+#SBATCH --account=esnitkin0
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+#SBATCH --mem=5g
+#SBATCH --time=02:00:00
+
+module load Bioinformatics mummer/4.0.0rc1
+module load R/4.4.0
+
+python dotplot.py -q input_fastas/ -s reference/B8441.fasta
