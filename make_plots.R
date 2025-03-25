@@ -18,9 +18,9 @@ colnames(plotdata) = c('subjectStart','subjectEnd','queryStart','queryEnd','subj
 
 # read in contig data and assign chromosome names, from largest to smallest
 make_contig_data = function(contig_data_frame){
-	contig_lengths = contig_data_frame$contig_length
-	name_key = sapply(1:length(contig_lengths),function(x){paste('chromosome_',x,sep='')})
-	names(name_key) = as.character(sort(contig_lengths,decreasing=TRUE))
+	contig_lengths = sort(contig_data_frame$contig_length,decreasing=TRUE)
+	name_key = sapply(1:length(contig_lengths),function(x){paste('C',x,'_',contig_lengths[x],sep='')})
+	names(name_key) = as.character(contig_lengths)
 	return(name_key)
 }
 
@@ -61,9 +61,13 @@ ylabel2 = ylabel2[length(ylabel2)]
 
 
 pdf(output_file)
+# ggplot() + facet_grid(queryChr~subjectChr,scales = 'free',drop = F) + xlim(0,NA) + ylim(0,NA)+ coord_cartesian(clip = "off")  + ggplot2::theme_bw() +
+# 	geom_segment(data=plotdata, aes(x=subjectStart, xend=subjectEnd, y=queryStart, yend=queryEnd)) + 
+# 	geom_point(data=limitdata,aes(x=subjectChrSize,y=queryChrSize),color='white',size=0.01) + theme(strip.text.x = element_text(size = 6),strip.text.y = element_text(size = 6),axis.text.x = element_blank()) +
+# 	xlab(xlabel2) + ylab(ylabel2)
 ggplot() + facet_grid(queryChr~subjectChr,scales = 'free',drop = F) + xlim(0,NA) + ylim(0,NA)+ coord_cartesian(clip = "off")  + ggplot2::theme_bw() +
 	geom_segment(data=plotdata, aes(x=subjectStart, xend=subjectEnd, y=queryStart, yend=queryEnd)) + 
-	geom_point(data=limitdata,aes(x=subjectChrSize,y=queryChrSize),color='white',size=0.01) + theme(strip.text.x = element_text(size = 6),strip.text.y = element_text(size = 6),axis.text.x = element_blank()) +
+	geom_point(data=limitdata,aes(x=subjectChrSize,y=queryChrSize),color='white',size=0.01) + theme(strip.text.x = element_text(size = 6),strip.text.y = element_text(size = 6)) +
 	xlab(xlabel2) + ylab(ylabel2)
 dev.off()
 
