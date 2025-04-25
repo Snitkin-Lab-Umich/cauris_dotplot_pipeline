@@ -13,9 +13,10 @@ def check_query(input_path):
         query_fasta_list.append(input_path)
     else:
         print('Unrecognized path for ')
+        quit(1)
     return(query_fasta_list)
 
-def check_suffix(path,suffix_list = ['.fasta','.fa']):
+def check_suffix(path,suffix_list = ['.fasta','.fa','.fna']):
     if any([path.endswith(x) for x in suffix_list]):
         return(True)
     else:
@@ -63,13 +64,13 @@ def count_contig_len(input_file,output_file):
             #print('\t'.join([str(x) for x in el])+'\n')
             _ = fh.write('\t'.join([str(x) for x in el])+'\n')
 
-def make_plots(nucmer_dir,nucmer_files,contig_data_dir,output_dir):
+def make_plots(nucmer_dir,nucmer_files,contig_data_dir,highlight_data,output_dir):
     for filename in nucmer_files:
         query_name,subject_name = filename.split('.coord')[0].split('_to_')
         query_contig_data = contig_data_dir + query_name + '_contig_data.csv'
         subject_contig_data = contig_data_dir + subject_name + '_contig_data.csv'
         output_file = output_dir + f'{query_name}_to_{subject_name}.pdf'
-        command = ['Rscript','make_plots.R',nucmer_dir + filename,subject_contig_data,query_contig_data,output_file]
+        command = ['Rscript','make_plots.R',nucmer_dir + filename,subject_contig_data,query_contig_data,highlight_data,output_file]
         subprocess.run(command)
 
 def main():
@@ -83,12 +84,17 @@ def main():
         )
     parser.add_argument(
         '--subject','-s',type=str,
-        help='''Provide a subject sequence in fasta format (.fasta or .fa). This should be a single file.''',
+        help='''Provide a subject sequence in the nucleotide fasta format (.fasta, .fa, or .fna). This should be a single file.''',
         default=None,required=True
         )
     parser.add_argument(
         '--name','-n',type=str,help='''(Optional) Provide a name for the run. This name will be used for all outputs.''',
         default='new_search'
+        )
+    parser.add_argument(
+        '--highlight','-hl',type=str,help='''(Optional) Provide a file containing regions to highlight on the plot. This needs to 
+        match the format of the provided highlight_data.tsv file.''',
+        default='NA'
         )
     # parser.add_argument(
     #     '--container','-c',type=str,help='''Provide a singularity container for MUMmer.
@@ -127,7 +133,9 @@ def main():
     # run nucmer, aligning each query to the subject
     coord_file_list = run_nucmer(query_list=query_fasta_list, subject=args.subject, output_dir=f'results/{args.name}/', debug='logs/debug_log.txt')
     # create the plots using the R script
-    make_plots(nucmer_dir=f'results/{args.name}/',nucmer_files=coord_file_list,contig_data_dir=f'temp/{args.name}/',output_dir=f'plots/{args.name}/')
+    make_plots(
+        nucmer_dir=f'results/{args.name}/',nucmer_files=coord_file_list,contig_data_dir=f'temp/{args.name}/',
+        highlight_data=args.highlight,output_dir=f'plots/{args.name}/')
 
 
 if __name__ == "__main__":
