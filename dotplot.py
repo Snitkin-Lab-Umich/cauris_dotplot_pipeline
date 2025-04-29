@@ -54,7 +54,10 @@ def count_contig_len(input_file,output_file):
             if line[0] == '>':
                 if t is not None:
                     data_list.append(t)
-                t = [line.split('>')[1],0]
+                contig_name = line.split('>')[1]
+                # remove anything after a space to keep contig names consistent with mummer and BLAST
+                contig_name = contig_name.split(' ')[0]
+                t = [contig_name,0]
             else:
                 t[1]+=len(line)
     data_list.append(t)

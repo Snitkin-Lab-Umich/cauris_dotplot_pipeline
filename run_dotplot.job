@@ -8,12 +8,13 @@
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=5g
-#SBATCH --time=00:07:00
+#SBATCH --time=01:00:00
 
 module load Bioinformatics mummer/4.0.0rc1
 module load R/4.4.0
 
-python dotplot_MODIFY2.py --query to318ko_data/reference/ \
---subject to318ko_data/query/ML2TQ8.fasta \
---name to318ko_v2
+# python dotplot.py --query query/MI_KPC_774/ \
+# --subject reference/kpc_assemblies/MI_KPC_774_flye_medaka_polypolish.fasta \
+# --name kpc_v1 --highlight highlight_data_KPC.tsv
 
+python sloop.py
