@@ -20,52 +20,34 @@ colnames(plotdata) = c('subjectStart','subjectEnd','queryStart','queryEnd','subj
 
 # read in contig data and assign chromosome names, from largest to smallest
 make_contig_data = function(contig_data_frame){
+	# read in the data frame
+	df = read.csv(contig_data_frame, sep = '\t',header = T)
 	# order the df from largest to smallest contig
-	ocdf = contig_data_frame[order(contig_data_frame$contig_length,decreasing=TRUE),]
-	# make a name_key, in this format: C{contig_number}_{contig_length}
+	ocdf = df[order(df$contig_length,decreasing=TRUE),]
+	# make a name_key as a column in the df, in this format: C{contig_number}_{contig_length}
 	ocdf$name_key = sapply(1:nrow(ocdf),function(x){paste('C',x,'_',ocdf$contig_length[x],sep='')})
-	return(ocdf)
-	#contig_lengths = sort(contig_data_frame$contig_length,decreasing=TRUE)
-	#name_key = sapply(1:length(contig_lengths),function(x){paste('C',x,'_',contig_lengths[x],sep='')})
-	#names(name_key) = as.character(contig_lengths)
-	#return(name_key)
+	# generate a vector that converts mummer's contig names to these new names
+	cdata_vec = ocdf$name_key
+	names(cdata_vec) = ocdf$contig_name
+	# return both
+	return(list('DF' = ocdf,'contig_key' = cdata_vec))
 }
 
-subjectContig = read.csv(subject_contig_data, sep = '\t',header = T)
-# order the contig data and add an extra column
-subjectContigDF = make_contig_data(subjectContig)
-# use this to make a key to convert contig names from mummer's names to mine
-subjectContigData = subjectContigDF$name_key
-names(subjectContigData) = subjectContigDF$contig_name
-#subjectContigData = make_contig_data(subjectContig)
 
-queryContig = read.csv(query_contig_data, sep = '\t',header = T)
-queryContigDF = make_contig_data(queryContig)
-# use this to make a key to convert contig names from mummer's names to mine
-queryContigData = queryContigDF$name_key
-names(queryContigData) = queryContigDF$contig_name
-#queryContigData = make_contig_data(queryContig)
+subjectContigOut = make_contig_data(subject_contig_data)
+subjectContigDF = subjectContigOut$DF
+subjectContigData = subjectContigOut$contig_key
 
-#print(subjectContigDF)
-#print(queryContigDF)
+queryContigOut = make_contig_data(query_contig_data)
+queryContigDF = queryContigOut$DF
+queryContigData = queryContigOut$contig_key
 
-# This section can subset the plots to specific contigs 
-# This should eventually be added as an option, but for now it needs to be manual
-# plotdata = plotdata[(plotdata$subjectScafLen > 450000 & plotdata$queryScafLen > 450000) | (plotdata$subjectTag == 'contig_74'),]
-# plotdata = plotdata[(plotdata$subjectTag == 'contig_42') & (plotdata$queryTag == 'scaffold_6'),]
-# subjectContigData = subjectContigData[names(subjectContigData) %in% as.character(plotdata$subjectScafLen)]
-# queryContigData = queryContigData[names(queryContigData) %in% as.character(plotdata$queryScafLen)]
 
-# use this information to rename the contigs in the coord file
-# rename with contig lengths
-#plotdata$subjectChr = factor(subjectContigData[as.character(plotdata$subjectScafLen)])
-#plotdata$queryChr = factor(queryContigData[as.character(plotdata$queryScafLen)])
-# rename with contig tags
-plotdata$subjectChr = factor(subjectContigData[plotdata$subjectTag])
-plotdata$queryChr = factor(queryContigData[plotdata$queryTag])
+# use this information to rename the contigs in the coord file 
+# the factor levels must be the chromosome names in ascending order for the subject and descending order for the query
+plotdata$subjectChr = factor(subjectContigData[plotdata$subjectTag], levels = subjectContigDF$name_key)
+plotdata$queryChr = factor(queryContigData[plotdata$queryTag], levels = rev(queryContigDF$name_key))
 
-#print(head(plotdata))
-#print(tail(plotdata))
 
 make_limitdata = function(subjectContigDF,queryContigDF){
 	limitdata = data.frame('subjectChr' = NA, 'subjectChrSize' = NA,'queryChr' = NA, 'queryChrSize' = NA)
@@ -76,15 +58,14 @@ make_limitdata = function(subjectContigDF,queryContigDF){
 			r = r + 1
 		}
 	}
-	limitdata$subjectChr = factor(limitdata$subjectChr)
-	limitdata$queryChr = factor(limitdata$queryChr)
+	# use the same levels as above
+	limitdata$subjectChr = factor(limitdata$subjectChr, levels = subjectContigDF$name_key)
+	limitdata$queryChr = factor(limitdata$queryChr, levels = rev(queryContigDF$name_key))
     limitdata$subjectChrSize = as.numeric(limitdata$subjectChrSize)
     limitdata$queryChrSize = as.numeric(limitdata$queryChrSize)
 	return(limitdata)
 }
 limitdata = make_limitdata(subjectContigDF,queryContigDF)
-
-#print(limitdata)
 
 
 # get axis names
@@ -97,28 +78,12 @@ ylabel2 = ylabel2[length(ylabel2)]
 
 
 # generate plot
-#pdf(output_file)
-# ggplot() + facet_grid(queryChr~subjectChr,scales = 'free',drop = F) + xlim(0,NA) + ylim(0,NA)+ coord_cartesian(clip = "off")  + ggplot2::theme_bw() +
-# 	geom_segment(data=plotdata, aes(x=subjectStart, xend=subjectEnd, y=queryStart, yend=queryEnd)) + 
-# 	geom_point(data=limitdata,aes(x=subjectChrSize,y=queryChrSize),color='white',size=0.01) + theme(strip.text.x = element_text(size = 6),strip.text.y = element_text(size = 6),axis.text.x = element_blank()) +
-# 	xlab(xlabel2) + ylab(ylabel2)
 gplot1 = ggplot() + facet_grid(queryChr~subjectChr,scales = 'free',drop = F) + xlim(0,NA) + ylim(0,NA)+ coord_cartesian(clip = "off")  + ggplot2::theme_bw() +
 	geom_point(data=limitdata,aes(x=subjectChrSize,y=queryChrSize),color='white',size=0.01) +
 	geom_segment(data=plotdata, aes(x=subjectStart, xend=subjectEnd, y=queryStart, yend=queryEnd)) +  
 	theme(strip.text.x = element_text(size = 6),strip.text.y = element_text(size = 6),axis.text.x = element_text(angle = 90,vjust=0.5,hjust=1)) +
 	xlab(xlabel2) + ylab(ylabel2)
-#dev.off()
 
-
-
-# generate a key that converts between the original and the new contig names
-# the new contig name (such as C6_972738) is the value, and the original contig name (such as contig_6) is used as the vector name
-# subjectContigKey = plotdata$subjectChr
-# names(subjectContigKey) = plotdata$subjectTag
-# subjectContigKey = subjectContigKey[!duplicated(subjectContigKey)]
-# queryContigKey = plotdata$queryChr
-# names(queryContigKey) = plotdata$queryTag
-# queryContigKey = queryContigKey[!duplicated(queryContigKey)]
 
 # make a default data frame that won't draw any lines
 linedata = limitdata
@@ -138,14 +103,10 @@ if (highlight_data != 'NA'){
 		hcontig = highlightdata$contig[i]
 		hstart = highlightdata$start[i]
 		hend = highlightdata$end[i]
-		print(c(htype,hname,subject_contig_data,hcontig,names(subjectContigData)))
 		if ((htype=='subject') & (grepl(hname,subject_contig_data)) & (hcontig %in% names(subjectContigData))){
-			print('RUNNING')
 			hcontig2 = subjectContigData[hcontig]
-			print(hcontig2)
 			linedata2[linedata2$subjectChr == hcontig2,]$xstart = hstart
 			linedata2[linedata2$subjectChr == hcontig2,]$xend = hend
-			print(linedata2)
 			gplot1 = gplot1 + geom_segment(data=linedata2,aes(x=xstart,xend=xend,y=ystart,yend=yend,color='red',linewidth=5),show.legend = F)
 		}
 		if ((htype=='query') & (grepl(hname,query_contig_data)) & (hcontig %in% names(queryContigData))){
@@ -159,7 +120,7 @@ if (highlight_data != 'NA'){
 
 pdf(output_file)
 gplot1
-dev.off()
+nothing = dev.off()
 
 
 

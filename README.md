@@ -36,7 +36,7 @@ This will generate your plots in the results/ directory. An explanation of each 
 
 ### --highlight
 
-(Optional) Provide a path to a table of regions to highlight. The selection regions of each contig will be indicated on the plot with a red box. This requires a specific format, and an example file is provided with highlight_data.tsv.
+(Optional) Provide a path to a table of regions to highlight. The selected regions of each contig will be indicated on the plot with a red box. This requires a specific format, and an example file is provided with highlight_data.tsv. You will also need to know the name of the contig or scaffold you want to highlight a region of, which can be determined via BLAST or with this tool: https://github.com/Snitkin-Lab-Umich/caurisblast. 
 
 
 
