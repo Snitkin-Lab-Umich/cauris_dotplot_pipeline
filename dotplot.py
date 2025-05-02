@@ -6,6 +6,8 @@ import argparse
 def check_query(input_path):
     query_fasta_list = []
     if os.path.isdir(input_path):
+        if not input_path.endswith('/'):
+            input_path+='/'
         for f in os.listdir(input_path):
             if check_suffix(f):
                 query_fasta_list.append(input_path + f)
@@ -37,7 +39,7 @@ def run_nucmer(query_list,subject,output_dir,debug):
             with open(file_prefix + '.coord','w') as fh_coord:
                 command2 = ['show-coords','-r','-c','-l','-T',file_prefix + '.delta']
                 subprocess.run(command2,stdout = fh_coord)
-                _ = debug_log.write('_'.join(command1)+'\n')
+                _ = debug_log.write(' '.join(command1)+'\n')
             # move both files to the results directory
             subprocess.run(['mv',file_prefix + '.delta',output_dir])
             subprocess.run(['mv',file_prefix + '.coord',output_dir])
@@ -64,8 +66,18 @@ def count_contig_len(input_file,output_file):
     with open(output_file,'w') as fh:
         _ = fh.write('contig_name\tcontig_length\n')
         for el in data_list:
-            #print('\t'.join([str(x) for x in el])+'\n')
             _ = fh.write('\t'.join([str(x) for x in el])+'\n')
+
+def get_nucmer_coord(nucmer_dir):
+    # take a nucmer results directory and generate a list of .coord files (the same output as run_nucmer above)
+    # returns and empty list if the path is not a directory
+    output_file_list = []
+    if os.path.isdir(nucmer_dir):
+        for fname in os.listdir(nucmer_dir):
+            if fname.endswith('.coord'):
+                output_file_list.append(fname)
+    return(output_file_list)
+
 
 def make_plots(nucmer_dir,nucmer_files,contig_data_dir,highlight_data,output_dir):
     for filename in nucmer_files:
@@ -83,12 +95,12 @@ def main():
         '--query','-q',type=str,
         help='''Provide a query to perform the alignments to. This can be either a single file or a directory of files.
         All subject files should be in the fasta format (.fasta or .fa).''',
-        default=None,required=True
+        default=None
         )
     parser.add_argument(
         '--subject','-s',type=str,
         help='''Provide a subject sequence in the nucleotide fasta format (.fasta, .fa, or .fna). This should be a single file.''',
-        default=None,required=True
+        default=None
         )
     parser.add_argument(
         '--name','-n',type=str,help='''(Optional) Provide a name for the run. This name will be used for all outputs.''',
@@ -99,46 +111,76 @@ def main():
         match the format of the provided highlight_data.tsv file.''',
         default='NA'
         )
-    # parser.add_argument(
-    #     '--container','-c',type=str,help='''Provide a singularity container for MUMmer.
-    #     The specified container will be used, instead of assuming you have MUMmer installed locally.''',
-    #     default=None
-    #     )
+    parser.add_argument(
+        '--alignments','-a',type=str,help='''(Optional) Provide a path to a previously-generated results directory. This will remake the plots using the 
+        Nucmer alignments and contig data present in the directory.''',
+        default=None
+        )
     args = parser.parse_args()
-    if args.query is None or args.subject is None:
-        print('Missing query or subject sequence')
+    # these statements don't cover all possbile inputs
+    if (args.query is None or args.subject is None) and (args.alignments is None):
+        print('No query+subject or results directory provided')
+        quit(1)
+    if (args.query is not None and args.subject is not None) and (args.alignments is not None):
+        print('Please provide either a query+subject or a results directory with Nucmer alignments, not both.')
         quit(1)
     # change working directory to location of script
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
-    # generate the files and directories needed for the BLAST search in this directory
-    for d in ['logs/',f'temp/{args.name}/',f'results/{args.name}/',f'plots/{args.name}/']:
+    # define all directories
+    nucmer_output_dir = f'results/{args.name}/nucmer/'
+    contig_data_dir = f'results/{args.name}/contig_data/'
+    plot_output_dir = f'plots/{args.name}/'
+    debug_log_dir = 'logs/'
+    debug_log_file = f'logs/{args.name}_debug_log.txt'
+    # generate the directories
+    dirlist = [debug_log_dir,contig_data_dir,nucmer_output_dir,plot_output_dir]
+    if args.alignments is not None:
+        dirlist = [debug_log_dir,plot_output_dir]
+    for d in dirlist:
         if not os.path.isdir(d):
             subprocess.call(['mkdir','-p',d])
-    # create log file in this directory
-    with open('logs/debug_log.txt','w') as fh:
+    # create log file
+    with open(debug_log_file,'w') as fh:
         _ = fh.write(f'debug log for {args.name}\n')
-    # check that subject and query exist
-    for f in [args.query,args.subject]:
-        if f is not None:
+    # if the alignments aren't already provided, generate them
+    if args.alignments is None:
+        # check that subject and query exist
+        for f in [args.query,args.subject]:
             if not os.path.exists(f):
                 print(f'Could not locate file or directory at {f}')
                 quit(1)
-    # fix paths
-    #args.query,args.subject = [os.path.abspath(x) if x is not None else x for x in [args.query,args.subject]]
-    # create list of query files
-    query_fasta_list = check_query(args.query)
-    #print(query_fasta_list)
-    # determine contig lengths for the query and subject
-    for fpath in query_fasta_list + [args.subject]:
-        fname = fpath.split('/')[-1].split('.fa')[0]
-        #print(fname)
-        count_contig_len(fpath,f'temp/{args.name}/' + fname + '_contig_data.csv')
-    # run nucmer, aligning each query to the subject
-    coord_file_list = run_nucmer(query_list=query_fasta_list, subject=args.subject, output_dir=f'results/{args.name}/', debug='logs/debug_log.txt')
-    # create the plots using the R script
+        # create list of query files
+        query_fasta_list = check_query(args.query)
+        # determine contig lengths for the query and subject
+        for fpath in query_fasta_list + [args.subject]:
+            fname = fpath.split('/')[-1].split('.fa')[0]
+            count_contig_len(fpath,contig_data_dir + fname + '_contig_data.csv')
+        # run nucmer, aligning each query to the subject
+        coord_file_list = run_nucmer(query_list=query_fasta_list, subject=args.subject, output_dir=nucmer_output_dir, debug=debug_log_file)
+        # create the plots using the R script
+    # if the alignments are provided, make sure everything looks as expected
+    else:
+        if os.path.isdir(args.alignments):
+            if not args.alignments.endswith('/'):
+                args.alignments+='/'
+            # replace paths with new versions
+            nucmer_output_dir = args.alignments + 'nucmer/'
+            contig_data_dir = args.alignments + 'contig_data/'
+            # get the list of .coord files
+            coord_file_list = get_nucmer_coord(nucmer_output_dir)
+            if coord_file_list == []:
+                print(f'No .coord files located in {args.alignments}')
+                quit(1)
+        else:
+            print(f'Could not locate results directory at {args.alignments}')
+            quit(1)
+    # make plots using all current paths
     make_plots(
-        nucmer_dir=f'results/{args.name}/',nucmer_files=coord_file_list,contig_data_dir=f'temp/{args.name}/',
-        highlight_data=args.highlight,output_dir=f'plots/{args.name}/')
+        nucmer_dir=nucmer_output_dir,nucmer_files=coord_file_list,contig_data_dir=contig_data_dir,
+        highlight_data=args.highlight,output_dir=plot_output_dir)
+    print(f'Finished making plots!')
+    print(f'Location of plots: {plot_output_dir}')
+    print(f'Location of Nucmer alignments: {nucmer_output_dir}')
 
 
 if __name__ == "__main__":
