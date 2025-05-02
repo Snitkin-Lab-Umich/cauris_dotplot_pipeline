@@ -38,5 +38,16 @@ This will generate your plots in the results/ directory. An explanation of each 
 
 (Optional) Provide a path to a table of regions to highlight. The selected regions of each contig will be indicated on the plot with a red box. This requires a specific format, and an example file is provided with highlight_data.tsv. You will also need to know the name of the contig or scaffold you want to highlight a region of, which can be determined via BLAST or with this tool: https://github.com/Snitkin-Lab-Umich/caurisblast. 
 
+## Output
 
+If the script ran successfully, a few different output directories will be generated:
+
+### plots/
+This contains all of your dotplots as .pdf files.
+### results/
+This contains the Nucmer results (.coord and .delta files).
+### temp/
+This contains tables with information about the contigs in your assemblies, such as names and lengths.
+### logs/
+This contains a log file for the most recent run.
 
