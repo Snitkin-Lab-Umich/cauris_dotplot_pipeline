@@ -10,7 +10,7 @@ module load Bioinformatics mummer/4.0.0rc1
 module load R/4.4.0
 ```
 
-Running the script will also install ggplot2 if you haven't done so already. 
+You will also need to install ggplot2 for R if you haven't done so already. 
 
 ## Generating Plots
 
