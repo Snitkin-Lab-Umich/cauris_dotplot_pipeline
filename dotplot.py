@@ -132,10 +132,11 @@ def main():
     plot_output_dir = f'plots/{args.name}/'
     debug_log_dir = 'logs/'
     debug_log_file = f'logs/{args.name}_debug_log.txt'
+    r_lib_dir = 'Rlib/'
     # generate the directories
-    dirlist = [debug_log_dir,contig_data_dir,nucmer_output_dir,plot_output_dir]
+    dirlist = [debug_log_dir,contig_data_dir,nucmer_output_dir,plot_output_dir,r_lib_dir]
     if args.alignments is not None:
-        dirlist = [debug_log_dir,plot_output_dir]
+        dirlist = [debug_log_dir,plot_output_dir,r_lib_dir]
     for d in dirlist:
         if not os.path.isdir(d):
             subprocess.call(['mkdir','-p',d])
