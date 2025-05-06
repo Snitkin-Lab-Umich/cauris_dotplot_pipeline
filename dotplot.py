@@ -127,16 +127,20 @@ def main():
     # change working directory to location of script
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     # define all directories
-    nucmer_output_dir = f'results/{args.name}/nucmer/'
-    contig_data_dir = f'results/{args.name}/contig_data/'
-    plot_output_dir = f'plots/{args.name}/'
-    debug_log_dir = 'logs/'
-    debug_log_file = f'logs/{args.name}_debug_log.txt'
-    r_lib_dir = 'Rlib/'
+    #nucmer_output_dir = f'results/{args.name}/nucmer/'
+    #contig_data_dir = f'results/{args.name}/contig_data/'
+    #plot_output_dir = f'plots/{args.name}/'
+    #debug_log_dir = 'logs/'
+    #debug_log_file = f'logs/{args.name}_debug_log.txt'
+    nucmer_output_dir = f'{args.name}/nucmer/'
+    contig_data_dir = f'{args.name}/contig_data/'
+    plot_output_dir = f'{args.name}/plots/'
+    debug_log_dir = f'{args.name}/'
+    debug_log_file = f'{args.name}/{args.name}_debug_log.txt'    
     # generate the directories
-    dirlist = [debug_log_dir,contig_data_dir,nucmer_output_dir,plot_output_dir,r_lib_dir]
+    dirlist = [debug_log_dir,contig_data_dir,nucmer_output_dir,plot_output_dir]
     if args.alignments is not None:
-        dirlist = [debug_log_dir,plot_output_dir,r_lib_dir]
+        dirlist = [debug_log_dir,plot_output_dir]
     for d in dirlist:
         if not os.path.isdir(d):
             subprocess.call(['mkdir','-p',d])
