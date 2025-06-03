@@ -24,13 +24,24 @@ def check_suffix(path,suffix_list = ['.fasta','.fa','.fna']):
     else:
         return(False)
 
-def run_nucmer(query_list,subject,output_dir,debug):
+def suffix_trim(fname):
+    if fname.endswith('.fasta') or fname.endswith('.fa'):
+        return(fname.split('.fa')[0])
+    elif fname.endswith('.fna'):
+        return(fname.split('.fna')[0])
+    else:
+        print('Incorrect file name when generating contig data')
+        quit(1)
+
+
+def run_nucmer(query_list,subject,output_dir,debug,rname):
     output_file_list = []
     subject_name = subject.split('/')[-1].split('.fa')[0]
     with open(debug,'a') as debug_log:
         for query in query_list:
             query_name = query.split('/')[-1].split('.fa')[0]
-            file_prefix = f'{query_name}_to_{subject_name}'
+            #file_prefix = f'{query_name}_to_{subject_name}'
+            file_prefix = rname
             # create the alignment file (A_to_B.delta)
             command1 = ['nucmer','-p',file_prefix,subject,query]
             subprocess.run(command1)
@@ -81,7 +92,7 @@ def get_nucmer_coord(nucmer_dir):
 
 def make_plots(nucmer_dir,nucmer_files,contig_data_dir,highlight_data,output_dir):
     for filename in nucmer_files:
-        query_name,subject_name = filename.split('.coord')[0].split('_to_')
+        #query_name,subject_name = filename.split('.coord')[0].split('_to_')
         query_contig_data = contig_data_dir + query_name + '_contig_data.csv'
         subject_contig_data = contig_data_dir + subject_name + '_contig_data.csv'
         output_file = output_dir + f'{query_name}_to_{subject_name}.pdf'
@@ -93,8 +104,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--query','-q',type=str,
-        help='''Provide a query to perform the alignments to. This can be either a single file or a directory of files.
-        All subject files should be in the fasta format (.fasta or .fa).''',
+        help='''Provide a query to perform the alignments to. This can be only be a single file!
+        All files should be in the fasta format (.fasta or .fa).''',
         default=None
         )
     parser.add_argument(
@@ -158,10 +169,11 @@ def main():
         query_fasta_list = check_query(args.query)
         # determine contig lengths for the query and subject
         for fpath in query_fasta_list + [args.subject]:
-            fname = fpath.split('/')[-1].split('.fa')[0]
+            #fname = fpath.split('/')[-1].split('.fa')[0]
+            fname = suffix_trim(fpath)
             count_contig_len(fpath,contig_data_dir + fname + '_contig_data.csv')
         # run nucmer, aligning each query to the subject
-        coord_file_list = run_nucmer(query_list=query_fasta_list, subject=args.subject, output_dir=nucmer_output_dir, debug=debug_log_file)
+        coord_file_list = run_nucmer(query_list=query_fasta_list, subject=args.subject, output_dir=nucmer_output_dir, debug=debug_log_file, rname=args.name)
         # create the plots using the R script
     # if the alignments are provided, make sure everything looks as expected
     else:
@@ -182,7 +194,7 @@ def main():
     # make plots using all current paths
     make_plots(
         nucmer_dir=nucmer_output_dir,nucmer_files=coord_file_list,contig_data_dir=contig_data_dir,
-        highlight_data=args.highlight,output_dir=plot_output_dir)
+        highlight_data=args.highlight,output_dir=plot_output_dir,rname=args.name)
     print(f'Finished making plots!')
     print(f'Location of plots: {plot_output_dir}')
     print(f'Location of Nucmer alignments: {nucmer_output_dir}')
