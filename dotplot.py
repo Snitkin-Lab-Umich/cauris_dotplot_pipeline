@@ -2,6 +2,7 @@ import os
 import subprocess
 import argparse
 import shutil
+import pandas as pd
 
 def generate_highlight_data(blast_query,dotplot_query,dotplot_subject,output_file,batch_name, minimum_evalue = 1e-5, minimum_identity = 0.8, minimum_coverage = 0.8):
     highlight_data_all = []
@@ -16,28 +17,32 @@ def generate_highlight_data(blast_query,dotplot_query,dotplot_subject,output_fil
     formatstr = '7 qaccver saccver pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen sstrand'
     for specific in ['dotplot_subject','dotplot_query']:
         batch_name_specific = batch_name + '_' + specific
+        print(f'Starting caurisblast for {specific}...')
         if specific == 'dotplot_query':
             blast_subject = dotplot_query
+            blast_subject_name = suffix_trim(dotplot_query)
         if specific == 'dotplot_subject':
             blast_subject = dotplot_subject
+            blast_subject_name = suffix_trim(dotplot_subject)
         command = ['python3','caurisblast/blast.py','-q',blast_query,'-s',blast_subject,'-t','nucl','-n',batch_name_specific,'-k','blastn','-e','1e-5','-f',formatstr,'-v']
         res = subprocess.run(command)
         if res.returncode != 0:
-            print('Error running caurisblast, please check the log files.')
+            print(f'Error running caurisblast for {specific}, please check the log files.')
             quit(1)
         # read the raw blast output as a csv, and use it to generate a highlight_data file
         raw_blast_output = f'caurisblast/results/{batch_name_specific}/{batch_name_specific}_nucl_blastn_1e-5_blast_results.csv'
         blastdf = read_blast(raw_blast_output)
-        highlight_data = blastdf_to_highlight_data(blastdf,specific.replace('dotplot_',''),minimum_evalue,minimum_identity,minimum_coverage)
+        highlight_data = blastdf_to_highlight_data(blastdf,specific.replace('dotplot_',''),blast_subject_name,minimum_evalue,minimum_identity,minimum_coverage)
         highlight_data_all+=highlight_data
     # write the highlight_data_dict to a tsv file
     with open(output_file,'w') as fh:
         _ = fh.write('type\tname\tcontig\tstart\tend\n')
-        for i in range(len(highlight_data_all)):
-            line = '\t'.join(i) + '\n'
+        for hdata in highlight_data_all:
+            towrite = [str(x) for x in hdata]
+            line = '\t'.join(towrite) + '\n'
             _ = fh.write(line)
 
-def blastdf_to_highlight_data(blastdf,sequence_type, minimum_evalue = 1e-5, minimum_identity = 0.8, minimum_coverage = 0.8):
+def blastdf_to_highlight_data(blastdf,sequence_type,sequence_name, minimum_evalue = 1e-5, minimum_identity = 0.8, minimum_coverage = 0.8):
     # take a blastdf directly from blastplus and use it to generate a highlight_data file
     # each query should have its best hit converted to a region to highlight on the plot
     highlight_data = []
@@ -56,7 +61,7 @@ def blastdf_to_highlight_data(blastdf,sequence_type, minimum_evalue = 1e-5, mini
             continue
         for _, row in blastdf_filtered.iterrows():
             # order is type,name,contig,start,end
-            highlight_data.append([sequence_type,row['assembly_name'],row['scaffold'],min(row['subject_start'], row['subject_end']),max(row['subject_start'], row['subject_end'])])
+            highlight_data.append([sequence_type,sequence_name,row['subject_seqid'],min(row['subject_start'], row['subject_end']),max(row['subject_start'], row['subject_end'])])
     return(highlight_data)
 
 def read_blast(file_path):
@@ -84,9 +89,8 @@ def check_query(input_path):
         return(input_path)
         # query_fasta_list.append(input_path)
     else:
-        print('Unrecognized path for ')
+        print(f'Unrecognized path for {input_path}')
         quit(1)
-    return(query_fasta_list)
 
 def check_suffix(path,suffix_list = ['.fasta','.fa','.fna']):
     if any([path.endswith(x) for x in suffix_list]):
@@ -100,7 +104,7 @@ def suffix_trim(fname):
     elif fname.endswith('.fna'):
         return(fname.split('/')[-1].split('.fna')[0])
     else:
-        print('Incorrect file name when generating contig data')
+        print(f'Incorrect file name when generating contig data for {fname}')
         quit(1)
 
 
@@ -234,13 +238,6 @@ def main():
     # create log file
     with open(debug_log_file,'w') as fh:
         _ = fh.write(f'debug log for {args.name}\n')
-    if args.blast_query != 'NA':
-        if not os.path.isfile(args.blast_query):
-            print(f'Could not locate blast query file at {args.blast_query}')
-            quit(1)
-        else:
-            highlight_file = args.name + '_highlight_data.tsv'
-            generate_highlight_data(args.blast_query,highlight_file)
     # if the alignments aren't already provided, generate them
     if args.alignments is None:
         # check that subject and query exist
@@ -264,6 +261,15 @@ def main():
         #     #fname = fpath.split('/')[-1].split('.fa')[0]
         #     fname = suffix_trim(fpath)
         #     count_contig_len(fpath,contig_data_dir + fname + '_contig_data.csv')
+        #
+        # generate the highlight_data file if a blast query is provided
+        if args.blast_query != 'NA':
+            if not os.path.isfile(args.blast_query):
+                print(f'Could not locate blast query file at {args.blast_query}')
+                quit(1)
+            else:
+                args.highlight = args.name + '_highlight_data.tsv'
+                generate_highlight_data(args.blast_query,query_fasta,args.subject,args.highlight,args.name, minimum_evalue = 1e-5, minimum_identity = 0.8, minimum_coverage = 0.8)
         # run nucmer, aligning each query to the subject
         coord_file_list = run_nucmer(query_list=[query_fasta], subject=args.subject, output_dir=nucmer_output_dir, debug=debug_log_file, rname=args.name)
         # create the plots using the R script
