@@ -1,6 +1,73 @@
 import os
 import subprocess
 import argparse
+import shutil
+
+def generate_highlight_data(blast_query,dotplot_query,dotplot_subject,output_file,batch_name, minimum_evalue = 1e-5, minimum_identity = 0.8, minimum_coverage = 0.8):
+    highlight_data_all = []
+    # if the caurisblast directory doesn't exist, clone it from github
+    if not os.path.isdir('caurisblast'):
+        subprocess.run(['git','clone','https://github.com/Snitkin-Lab-Umich/caurisblast','caurisblast'])
+    # ensure the blastplus module is loaded
+    if shutil.which('blastn') is None:
+        print('blastn not found in PATH. Please ensure blast+ is installed or loaded and blastn is in your PATH.')
+        quit(1)
+    # run caurisblast using both arrangements of query and subject
+    formatstr = '7 qaccver saccver pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen sstrand'
+    for specific in ['dotplot_subject','dotplot_query']:
+        batch_name_specific = batch_name + '_' + specific
+        if specific == 'dotplot_query':
+            blast_subject = dotplot_query
+        if specific == 'dotplot_subject':
+            blast_subject = dotplot_subject
+        command = ['python3','caurisblast/blast.py','-q',blast_query,'-s',blast_subject,'-t','nucl','-n',batch_name_specific,'-k','blastn','-e','1e-5','-f',formatstr,'-v']
+        res = subprocess.run(command)
+        if res.returncode != 0:
+            print('Error running caurisblast, please check the log files.')
+            quit(1)
+        # read the raw blast output as a csv, and use it to generate a highlight_data file
+        raw_blast_output = f'caurisblast/results/{batch_name_specific}/{batch_name_specific}_nucl_blastn_1e-5_blast_results.csv'
+        blastdf = read_blast(raw_blast_output)
+        highlight_data = blastdf_to_highlight_data(blastdf,specific.replace('dotplot_',''),minimum_evalue,minimum_identity,minimum_coverage)
+        highlight_data_all+=highlight_data
+    # write the highlight_data_dict to a tsv file
+    with open(output_file,'w') as fh:
+        _ = fh.write('type\tname\tcontig\tstart\tend\n')
+        for i in range(len(highlight_data_all)):
+            line = '\t'.join(i) + '\n'
+            _ = fh.write(line)
+
+def blastdf_to_highlight_data(blastdf,sequence_type, minimum_evalue = 1e-5, minimum_identity = 0.8, minimum_coverage = 0.8):
+    # take a blastdf directly from blastplus and use it to generate a highlight_data file
+    # each query should have its best hit converted to a region to highlight on the plot
+    highlight_data = []
+    blastdf['assembly_name'] = blastdf['subject_seqid']
+    blastdf['subject_scaffold'] = blastdf['subject_seqid']
+    #blastdf['assembly_name'] = blastdf['subject_seqid'].apply(lambda x: x.split('.scaffolds')[0])
+    #blastdf['subject_scaffold'] = blastdf['subject_seqid'].apply(lambda x: x.split('.scaffolds_')[1])
+    for assembly_name, assembly_blastdf in blastdf.groupby('assembly_name'):
+        assembly_blastdf['coverage'] = assembly_blastdf['alignment_length'] / assembly_blastdf['query_length']
+        blastdf_filtered = assembly_blastdf[
+            (assembly_blastdf['percent_identity'] >= minimum_identity * 100) &
+            (assembly_blastdf['evalue'] <= minimum_evalue) &
+            (assembly_blastdf['coverage'] >= minimum_coverage)
+        ]
+        if blastdf_filtered.empty:
+            continue
+        for _, row in blastdf_filtered.iterrows():
+            # order is type,name,contig,start,end
+            highlight_data.append([sequence_type,row['assembly_name'],row['scaffold'],min(row['subject_start'], row['subject_end']),max(row['subject_start'], row['subject_end'])])
+    return(highlight_data)
+
+def read_blast(file_path):
+    # parse the BLAST output by skipping the first five lines, treating the rest as tab-separated values
+    blastdf = pd.read_csv(file_path, sep='\t', comment='#', header=None)
+    # rename columns
+    blastdf.columns = [
+        'query_seqid', 'subject_seqid', 'percent_identity', 'alignment_length', 'mismatches_count', 'gapopen_count',
+        'query_start', 'query_end', 'subject_start', 'subject_end', 'evalue', 'bitscore', 'query_length', 'subject_length', 'subject_strand'
+    ]
+    return blastdf
 
 
 def check_query(input_path):
@@ -127,6 +194,11 @@ def main():
         default='NA'
         )
     parser.add_argument(
+        '--blast_query','-bq',type=str,help='''(Optional) Provide a fasta file containing sequences to highlight on the plot. A highlight_data.tsv file will be generated  
+        using caurisblast.''',
+        default='NA'
+        )
+    parser.add_argument(
         '--alignments','-a',type=str,help='''(Optional) Provide a path to a previously-generated results directory. This will remake the plots using the 
         Nucmer alignments and contig data present in the directory.''',
         default=None
@@ -162,6 +234,13 @@ def main():
     # create log file
     with open(debug_log_file,'w') as fh:
         _ = fh.write(f'debug log for {args.name}\n')
+    if args.blast_query != 'NA':
+        if not os.path.isfile(args.blast_query):
+            print(f'Could not locate blast query file at {args.blast_query}')
+            quit(1)
+        else:
+            highlight_file = args.name + '_highlight_data.tsv'
+            generate_highlight_data(args.blast_query,highlight_file)
     # if the alignments aren't already provided, generate them
     if args.alignments is None:
         # check that subject and query exist
