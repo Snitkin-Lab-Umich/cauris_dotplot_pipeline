@@ -6,7 +6,7 @@ This script takes input assemblies (in the form of .fasta files) and generates s
 In order to run this script on the Great Lakes cluster, load these modules first:
 
 ```
-module load Bioinformatics mummer/4.0.0rc1
+module load Bioinformatics mummer/4.0.0rc1 blast-plus/2.16.0
 module load R/4.4.0
 ```
 
